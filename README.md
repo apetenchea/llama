@@ -51,7 +51,7 @@ conda install cuda --channel nvidia/label/cuda-12.2.0
 
 Go to the [PyTorch website](https://pytorch.org/get-started/locally/) and select your OS and CUDA version. In my case,
 I went with the following:
-[PyTorch Configuration](images/pytorch.png)
+![PyTorch Configuration](images/pytorch.png)
 
 For making sure that everything is working, you can run the following:
 ```shell
@@ -256,7 +256,7 @@ llama_print_timings:       total time = 72030.84 ms
 
 The default configuration uses 16 threads. My computer has 32 cores, so I'm using half of them. You can change this by
 tweaking the `-t` parameter. See `./build/bin/main -h` for more details.
-[htop](images/htop.png)
+![htop](images/htop.png)
 
 Hence, the LLM is now usable on my computer. If the 8-bit model is too slow for you, try the 4-bit quantization.  
 If you're on Windows, you can get llama.cpp binaries from their [releases page](https://github.com/ggerganov/llama.cpp/releases).

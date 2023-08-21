@@ -1,104 +1,271 @@
-# Llama 2
+# Running Llama 2 Locally
 
-We are unlocking the power of large language models. Our latest version of Llama is now accessible to individuals, creators, researchers and businesses of all sizes so that they can experiment, innovate and scale their ideas responsibly. 
+[Llama 2](https://ai.meta.com/research/publications/llama-2-open-foundation-and-fine-tuned-chat-models/) is a collection
+of pretrained and fine-tuned large language models (LLMs) ranging in scale from 7B to 70B parameters.  
+At the time of this writing, the official way of getting the weights is through the
+[Meta AI website](https://ai.meta.com/resources/models-and-libraries/llama-downloads/).
 
-This release includes model weights and starting code for pretrained and fine-tuned Llama language models — ranging from 7B to 70B parameters.
+## Purpose of this fork
 
-This repository is intended as a minimal example to load [Llama 2](https://ai.meta.com/research/publications/llama-2-open-foundation-and-fine-tuned-chat-models/) models and run inference. For more detailed examples leveraging HuggingFace, see [llama-recipes](https://github.com/facebookresearch/llama-recipes/).
+I wanted to set aside instructions for running Llama 2 locally, with minimal dependencies.
+This is my how-to guide. The original README from facebookresearch is [here](https://github.com/facebookresearch/llama).
 
-## Updates post-launch
+I have experimented with Llama 2 on two of my workstations:
+- a System76 Gazelle laptop with an Intel i7-11800H CPU and an Nvidia RTX 3050 Ti GPU
+- a Mifcom desktop with an AMD Ryzen 9 5950X 16-Core Processor CPU and a negligible GPU
 
-See [UPDATES.md](UPDATES.md).
+## Create a separate environment
 
-## Download
+I use [conda](https://docs.conda.io/en/latest/) to manage my Python environments. Personally, I find a Miniconda
+installation to be more than enough.
 
-⚠️ **7/18: We're aware of people encountering a number of download issues today. Anyone still encountering issues should remove all local files, re-clone the repository, and [request a new download link](https://ai.meta.com/resources/models-and-libraries/llama-downloads/). It's critical to do all of these in case you have local corrupt files. When you receive the email, copy *only* the link text - it should begin with https://download.llamameta.net and not with https://l.facebook.com, which will give errors.**
-
-In order to download the model weights and tokenizer, please visit the [Meta AI website](https://ai.meta.com/resources/models-and-libraries/llama-downloads/) and accept our License.
-
-Once your request is approved, you will receive a signed URL over email. Then run the download.sh script, passing the URL provided when prompted to start the download. Make sure that you copy the URL text itself, **do not use the 'Copy link address' option** when you right click the URL. If the copied URL text starts with: https://download.llamameta.net, you copied it correctly. If the copied URL text starts with: https://l.facebook.com, you copied it the wrong way.
-
-Pre-requisites: make sure you have `wget` and `md5sum` installed. Then to run the script: `./download.sh`.
-
-Keep in mind that the links expire after 24 hours and a certain amount of downloads. If you start seeing errors such as `403: Forbidden`, you can always re-request a link.
-
-### Access on Hugging Face
-
-We are also providing downloads on [Hugging Face](https://huggingface.co/meta-llama). You must first request a download from the Meta AI website using the same email address as your Hugging Face account. After doing so, you can request access to any of the models on Hugging Face and within 1-2 days your account will be granted access to all versions.
-
-## Setup
-
-In a conda env with PyTorch / CUDA available, clone the repo and run in the top-level directory:
-
-```
-pip install -e .
+```shell
+conda create -n llama
+conda activate llama
 ```
 
-## Inference
+## CUDA Toolkit
 
-Different models require different model-parallel (MP) values:
-
-|  Model | MP |
-|--------|----|
-| 7B     | 1  |
-| 13B    | 2  |
-| 70B    | 8  |
-
-All models support sequence length up to 4096 tokens, but we pre-allocate the cache according to `max_seq_len` and `max_batch_size` values. So set those according to your hardware.
-
-### Pretrained Models
-
-These models are not finetuned for chat or Q&A. They should be prompted so that the expected answer is the natural continuation of the prompt.
-
-See `example_text_completion.py` for some examples. To illustrate, see command below to run it with the llama-2-7b model (`nproc_per_node` needs to be set to the `MP` value):
-
+If you're going to use an Nvidia GPU to run your models, you need to install the appropriate driver.
+Installation guides for both Windows and Linux are available at [nvidia.com](https://www.nvidia.com/download/index.aspx).
+Strictly speaking, you don't need a GPU to run Llama, but it can speed up the inference considerably.  
+Once you got it up and running, you can check your version with `nvidia-smi`:
 ```
-torchrun --nproc_per_node 1 example_text_completion.py \
-    --ckpt_dir llama-2-7b/ \
-    --tokenizer_path tokenizer.model \
-    --max_seq_len 128 --max_batch_size 4
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 536.67                 Driver Version: 536.67       CUDA Version: 12.2     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                     TCC/WDDM  | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  NVIDIA GeForce RTX 3050 ...  WDDM  | 00000000:01:00.0  On |                  N/A |
+| N/A   55C    P8               6W /  60W |    792MiB /  4096MiB |      3%      Default |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
 ```
-
-### Fine-tuned Chat Models
-
-The fine-tuned models were trained for dialogue applications. To get the expected features and performance for them, a specific formatting defined in [`chat_completion`](https://github.com/facebookresearch/llama/blob/main/llama/generation.py#L212)
-needs to be followed, including the `INST` and `<<SYS>>` tags, `BOS` and `EOS` tokens, and the whitespaces and breaklines in between (we recommend calling `strip()` on inputs to avoid double-spaces).
-
-You can also deploy additional classifiers for filtering out inputs and outputs that are deemed unsafe. See the llama-recipes repo for [an example](https://github.com/facebookresearch/llama-recipes/blob/main/inference/inference.py) of how to add a safety checker to the inputs and outputs of your inference code.
-
-Examples using llama-2-7b-chat:
-
-```
-torchrun --nproc_per_node 1 example_chat_completion.py \
-    --ckpt_dir llama-2-7b-chat/ \
-    --tokenizer_path tokenizer.model \
-    --max_seq_len 512 --max_batch_size 4
+Notice that my CUDA Version is 12.2. Yours might be different.  
+The next step is to install the specific CUDA Toolkit version that matches your driver:
+```shell
+conda install cuda --channel nvidia/label/cuda-12.2.0
 ```
 
-Llama 2 is a new technology that carries potential risks with use. Testing conducted to date has not — and could not — cover all scenarios.
-In order to help developers address these risks, we have created the [Responsible Use Guide](Responsible-Use-Guide.pdf). More details can be found in our research paper as well.
+Go to the [PyTorch website](https://pytorch.org/get-started/locally/) and select your OS and CUDA version. In my case,
+I went with the following:
+[PyTorch Configuration](images/pytorch.png)
 
-## Issues
+For making sure that everything is working, you can run the following:
+```shell
+nvcc --version
+```
+Which gave me this:
+```
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2023 NVIDIA Corporation
+Built on Tue_Jun_13_19:42:34_Pacific_Daylight_Time_2023
+Cuda compilation tools, release 12.2, V12.2.91
+Build cuda_12.2.r12.2/compiler.32965470_0
+```
+And then:
+```shell
+python -c "import torch; print(torch.__version__)"
+```
+Which gave me this:
+```
+2.1.0.dev20230805+cu121
+```
 
-Please report any software “bug,” or other problems with the models through one of the following means:
-- Reporting issues with the model: [github.com/facebookresearch/llama](http://github.com/facebookresearch/llama)
-- Reporting risky content generated by the model: [developers.facebook.com/llama_output_feedback](http://developers.facebook.com/llama_output_feedback)
-- Reporting bugs and security concerns: [facebook.com/whitehat/info](http://facebook.com/whitehat/info)
+## Pure Python
 
-## Model Card
-See [MODEL_CARD.md](MODEL_CARD.md).
+The most straight forward way to run Llama 2 is directly from Python.
+This is also the slowest to run on layman hardware. First, make sure you have the necessary dependencies:
+```shell
+pip install -r requirements.txt
+```
 
-## License
+Before starting, move the desired Llama 2 model folder to the top-level directory of this repo. I picked
+`llama-2-7b-chat`, and even for that one, my laptop took a while to load the model.
 
-Our model and weights are licensed for both researchers and commercial entities, upholding the principles of openness. Our mission is to empower individuals, and industry through this opportunity, while fostering an environment of discovery and ethical AI advancements. 
+```shell
+D:\llama>ls llama-2-7b-chat
+checklist.chk  consolidated.00.pth  params.json
+```
 
-See the [LICENSE](LICENSE) file, as well as our accompanying [Acceptable Use Policy](USE_POLICY.md)
+There are two important parameters of LLMs:
+1. Temperature  
+In short, the lower the temperature, the more deterministic the results in the sense that the highest probable
+next token is always picked. Increasing temperature could lead to more randomness, which encourages more diverse
+or creative outputs. You are essentially increasing the weights of the other possible tokens.
+In terms of application, you might want to use a lower temperature value for tasks like fact-based QA to encourage more
+factual and concise responses. For poem generation or other creative tasks, it might be beneficial to increase the
+temperature value.
+2. Top_p  
+You can control how deterministic the model is at generating a response.
+If you are looking for exact and factual answers keep this low. If you are looking for more diverse responses,
+increase to a higher value. 
+
+### GPU (Windows)
+
+Start the chat script:
+```
+torchrun --nproc_per_node 1 chat.py --ckpt_dir llama-2-7b-chat --tokenizer_path tokenizer.model
+```
+The model loaded in 75.11 seconds.
+```
+Enter prompt (or type exit): Generate a chocolate chip cookies recipe
+Answer:   Sure, here's a classic chocolate chip cookie recipe that yields delicious and chewy cookies:
+
+Ingredients:
+
+* 2 1/4 cups all-purpose flour
+* 1 teaspoon baking soda
+* 1 teaspoon salt
+* 1 cup unsalted butter, at room temperature
+* 3/4 cup white granulated sugar
+* 3/4 cup brown sugar
+* 2 large eggs
+* 2 teaspoons vanilla extract
+* 2 ounces (1/4 cup) semisweet chocolate chips
+
+Instructions:
+
+1. Preheat the oven to 375°F (190°C). Line a baking sheet with parchment paper.
+2. In a medium bowl, whisk together the flour, baking soda, and salt.
+3. In a large bowl, use an electric mixer to beat the butter and sugars until light and fluffy, about 2 minutes. Beat in the eggs one at a time, followed by the vanilla extract.
+4. Gradually mix in the dry ingredients until just combined, being careful not to overmix.
+5. Stir in the chocolate chips.
+6. Drop rounded tablespoonfuls of the dough onto the prepared baking sheet, about 2 inches apart.
+7. Bake for 10-12 minutes, or until the edges are lightly golden brown.
+8. Remove the cookies from the oven and let them cool on the baking sheet for 5 minutes, then transfer them to a wire rack to cool completely.
+
+Enjoy your delicious homemade chocolate chip cookies!
+```
+
+This took approximately 10 minutes (621 seconds). On my laptop, that would be quite a slow chat experience.
+
+## llama.cpp
+
+llama.cpp is a C++ project that allows you to run Llama 2 (and other models) using quantization.
+The quantization I'm going to use in my examples is to int8.
+
+**What is quantization?**
+Quoting from [hugginface](https://huggingface.co/docs/optimum/concept_guides/quantization):
+
+"Quantization is a technique to reduce the computational and memory costs of running inference by representing
+the weights and activations with low-precision data types like 8-bit integer (int8) instead of the usual
+32-bit floating point (float32). 
+Reducing the number of bits means the resulting model requires less memory storage, consumes less energy (in theory),
+and operations like matrix multiplication can be performed much faster with integer arithmetic.
+It also allows to run models on embedded devices, which sometimes only support integer data types."
+
+In my own words, say that the model weights will go from 32-bit floating point numbers to 8-bit integers.
+This is a lossy compression, but it can speed up the inference. How can 32-bit floats be represented as 8-bit integers,
+while not rendering the model useless?
+If you've ever worked with numerical features, you have probably encountered the concept of scaling. For example,
+if you have a feature that ranges from 0 to 100, you can scale it to range from 0 to 1. Simply put, the same concept can be
+applied to the weights and activations of the neural network. Check out how the
+[StandardScaler](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html) works if
+you've never used it before, it's quite simple. This, combined with clipping, can be used to map the 32-bit floats to
+8-bit integers.
+
+There are other ways to quantize a model, but I'm not going to go into that here. You don't really need to understand
+the details of quantization to use llama.cpp.
+
+### CPU (Linux)
+
+I first set up [llama.cpp](https://github.com/ggerganov/llama.cpp):
+```shell
+git clone git@github.com:ggerganov/llama.cpp.git
+cd llama.cpp
+mkdir build
+cd build
+cmake ..
+cmake --build . --config Release
+cd ..
+pip install -r requirements.txt
+```
+
+If you have multiple C++ compilers, or cmake can't find the right one, you can specify it like this (I'm using clang++14):
+```shell
+```shell
+cmake -DCMAKE_CXX_COMPILER=clang++-14 ..
+````
+
+Then copy the llama 2 model weights into the `models` directory inside the llama.cpp repo. Run the following commands
+from the top-level directory of llama.cpp and llama:
+```shell
+cp -r llama/llama-2-7b-chat llama.cpp/models/7B
+cp -r llama/tokenizer_checklist.chk llama.cpp/models/
+cp -r llama/tokenizer.model llama.cpp/models/
+```
+
+Convert the 7B model to ggml FP16 format:
+```shell
+python convert.py models/7B/
+```
+
+Quantize the model to 8 bits:
+```shell
+./build/bin/quantize ./models/7B/ggml-model-f32.bin ./models/7B/ggml-model-q8_0.bin q8_0
+```
+
+Run a sample inference to check that everything is working:
+```shell
+./build/bin/main -m ./models/7B/ggml-model-q8_0.bin -n 128
+```
+
+Try it out in chat mode:
+```shell
+./build/bin/main -m ./models/7B/ggml-model-q8_0.bin -n -1 --repeat_penalty 1.0 --color -i -r "User:" -f prompts/chat-with-bob.txt
+```
+
+I gave it the same prompt as before, but this time our whole interaction took just a little longer than 1 minute (72 seconds).
+```shell
+User:Generate a chocolate chip cookies recipe
+Bob: Of course! Here is a simple recipe for chocolate chip cookies that yields delicious results:
+Ingredients:
+* 2 1/4 cups all-purpose flour
+* 1 teaspoon baking soda
+* 1 teaspoon salt
+* 1 cup unsalted butter, softened
+* 3/4 cup white granulated sugar
+* 1 cup brown sugar
+* 2 large eggs
+* 2 teaspoons vanilla extract
+* 2 ounces semisweet chocolate chips
+
+Instructions:
+1. Preheat your oven to 375 degrees Fahrenheit (190 degrees Celsius). Line a baking sheet with parchment paper.
+2. In a medium-sized bowl, whisk together the flour, baking soda, and salt. Set aside.
+3. In a large bowl, use an electric mixer to cream together the butter and sugars until light and fluffy.
+4. Beat in the eggs and vanilla extract until well combined.
+5. Gradually mix in the flour mixture until a dough forms.
+6. Stir in the chocolate chips.
+7. Drop rounded spoonfuls of the dough onto the prepared baking sheet, leaving about 2 inches of space between each cookie.
+8. Bake for 10-12 minutes, or until the edges are lightly golden brown.
+9. Remove the cookies from the oven and let them cool on the baking sheet for 5 minutes before transferring them to a wire rack to cool completely.
+
+I hope you enjoy these chocolate chip cookies! Let me know if you have any questions or need any further assistance.
+User:
+
+llama_print_timings:        load time =   379.63 ms
+llama_print_timings:      sample time =    53.33 ms /   400 runs   (    0.13 ms per token,  7500.33 tokens per second)
+llama_print_timings: prompt eval time =  1912.72 ms /   110 tokens (   17.39 ms per token,    57.51 tokens per second)
+llama_print_timings:        eval time = 66839.05 ms /   399 runs   (  167.52 ms per token,     5.97 tokens per second)
+llama_print_timings:       total time = 72030.84 ms
+```
+
+The default configuration uses 16 threads. My computer has 32 cores, so I'm using half of them. You can change this by
+tweaking the `-t` parameter. See `./build/bin/main -h` for more details.
+[htop](images/htop.png)
+
+Hence, the LLM is now usable on my computer. If the 8-bit model is too slow for you, try the 4-bit quantization.  
+If you're on Windows, you can get llama.cpp binaries from their [releases page](https://github.com/ggerganov/llama.cpp/releases).
+
+## Further experimentaion
+
+See [llama-recipes](https://github.com/facebookresearch/llama-recipes).
 
 ## References
 
-1. [Research Paper](https://ai.meta.com/research/publications/llama-2-open-foundation-and-fine-tuned-chat-models/)
-2. [Llama 2 technical overview](https://ai.meta.com/resources/models-and-libraries/llama)
-3. [Open Innovation AI Research Community](https://ai.meta.com/llama/open-innovation-ai-research-community/)
-
-## Original LLaMA
-The repo for the original llama release is in the [`llama_v1`](https://github.com/facebookresearch/llama/tree/llama_v1) branch.
+1. [promptingguide.ai](https://www.promptingguide.ai/)
+2. [barrelsofdata.com](https://barrelsofdata.com/llama-ai-language-model-on-laptop)

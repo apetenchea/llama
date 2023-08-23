@@ -172,7 +172,7 @@ the details of quantization to use llama.cpp.
 
 ### CPU (Linux)
 
-I first set up [llama.cpp](https://github.com/ggerganov/llama.cpp):
+I first set up [llama.cpp](https://github.com/ggerganov/llama.cpp) (note that when I did all of this I they were at commit f31b5397143009d682db90fd2a6cde83f1ef00eb):
 ```shell
 git clone git@github.com:ggerganov/llama.cpp.git
 cd llama.cpp
